@@ -1,19 +1,39 @@
 // game.js
-// Classe principal que controla toda a lógica do jogo (Fase 2)
-
 const Player = require("./player");
 const Room = require("./room");
-const { Ferramenta } = require("./ferramenta");
+const Ferramenta = require("./ferramenta");
+const Chave = require("./chave");
+const Consumivel = require("./consumivel");
 const Objeto = require("./objeto");
 
 class Game {
+    #player;
+    #rooms;
+    #currentRoom;
+    #fim;
+    #flags;
+
     constructor(playerName = "Jogador") {
-        this.player = new Player(playerName);
-        this.rooms = {};
-        this.currentRoom = null;
-        this.fim = false;
-        this.energiaRestaurada = false;
-        this.cofreAberto = false;
+        this.#player = new Player(playerName);
+        this.#rooms = {};
+        this.#currentRoom = null;
+        this.#fim = false;
+        this.#flags = {
+            energiaRestaurada: false,
+            cofreAberto: false
+        };
+    }
+
+    get fim() {
+        return this.#fim;
+    }
+
+    get player() {
+        return this.#player;
+    }
+
+    get currentRoom() {
+        return this.#currentRoom;
     }
 
     setup() {
@@ -37,54 +57,29 @@ class Game {
         porao.setExit("leste", saida);
         saida.setExit("oeste", porao);
 
-        // ---------- Ferramentas ----------
-        const cartao = new Ferramenta(
-            "cartão magnético",
-            "Ativa o terminal da Biblioteca",
-            Infinity,
-            (target) => {
-                if (target.name === "Terminal da Biblioteca") {
-                    console.log("Terminal ativado!");
-                    return true;
-                }
-                console.log("Nada aconteceu.");
-                return false;
+        // ---------- Ferramentas e Consumíveis ----------
+        const cartao = new Ferramenta("cartão magnético", "Ativa o terminal da Biblioteca", Infinity, (target) => {
+            if (target.name === "Terminal da Biblioteca") {
+                console.log("Terminal ativado!");
+                return true;
             }
-        );
+            return false;
+        });
 
-        const chaveVelha = new Ferramenta(
-            "chave velha",
-            "Abre o Porão",
-            Infinity,
-            (target) => {
-                if (target.name === "Porão") {
-                    console.log("Porão destrancado!");
-                    return true;
-                }
-                console.log("Nada aconteceu.");
-                return false;
+        const chaveVelha = new Chave("chave velha", "Abre o Porão", "Porão");
+        const fusivel = new Consumivel("fusível", "Restaura energia do Porão", (target) => {
+            if (target.name === "Painel de Energia") {
+                console.log("Energia restaurada!");
+                this.#flags.energiaRestaurada = true;
+                return true;
             }
-        );
-
-        const fusivel = new Ferramenta(
-            "fusível",
-            "Restaura energia do Porão",
-            Infinity,
-            (target) => {
-                if (target.name === "Painel de Energia") {
-                    console.log("Energia restaurada!");
-                    this.energiaRestaurada = true;
-                    return true;
-                }
-                console.log("Nada aconteceu.");
-                return false;
-            }
-        );
+            return false;
+        });
 
         // ---------- Objetos ----------
         const cofre = new Objeto("Cofre", "Cofre trancado", "Cofre aberto com duas chaves dentro");
-        const chaveVerdadeira = new Ferramenta("chave verdadeira", "Abre a porta final", 1);
-        const chaveFalsa = new Ferramenta("chave falsa", "Parecia ser a chave certa...", 1);
+        const chaveVerdadeira = new Chave("chave verdadeira", "Abre a porta final", "Porta Final");
+        const chaveFalsa = new Chave("chave falsa", "Parecia ser a chave certa...", "Porta Final");
         cofre.chaves = [chaveVerdadeira, chaveFalsa];
 
         const portaFinal = new Objeto("Porta Final", "Porta trancada", "Porta aberta - você venceu!");
@@ -97,77 +92,79 @@ class Game {
         saida.addItem(portaFinal);
 
         // ---------- Salas no jogo ----------
-        this.rooms = { hall, biblioteca, cozinha, jardim, porao, saida };
-        this.currentRoom = hall;
+        this.#rooms = { hall, biblioteca, cozinha, jardim, porao, saida };
+        this.#currentRoom = hall;
     }
 
     start() {
         console.log("Bem-vindo ao Escape do Laboratório - Fase 2!");
-        this.currentRoom.describe();
+        this.#currentRoom.describe();
     }
 
     move(direction) {
-        const nextRoom = this.currentRoom.exits[direction];
+        const nextRoom = this.#currentRoom.getExit(direction);
         if (nextRoom) {
-            this.currentRoom = nextRoom;
-            this.currentRoom.describe();
+            this.#currentRoom = nextRoom;
+            this.#currentRoom.describe();
         } else {
             console.log("Não é possível ir nessa direção.");
         }
     }
 
     take(itemName) {
-        const item = this.currentRoom.items.find(i => i.name === itemName);
+        const item = this.#currentRoom.getItemByName(itemName);
         if (item) {
-            this.player.addItem(item);
-            this.currentRoom.removeItem(itemName);
+            this.#player.addItem(item);
+            this.#currentRoom.removeItem(itemName);
         } else {
             console.log("Esse item não está aqui.");
         }
     }
 
-    use(toolName, targetName) {
-        const tool = this.player.getItem(toolName);
-        if (!tool) {
-            console.log("Você não possui essa ferramenta.");
+    use(itemName, targetName) {
+        const item = this.#player.getItem(itemName);
+        if (!item) {
+            console.log("Você não possui esse item.");
             return;
         }
 
-        const target = this.currentRoom.items.find(i => i.name === targetName) || { name: targetName };
+        let target = this.#currentRoom.getItemByName(targetName) || { name: targetName };
 
-        if (target instanceof Objeto && target.name === "Cofre") {
-            if (tool.name === "chave velha") {
-                console.log("Cofre destrancado!");
-                target.acaoOk = true;
-                this.cofreAberto = true;
-                target.chaves.forEach(k => this.player.addItem(k));
-                return;
-            }
+        // Tratamento especial para cofre
+        if (target.name === "Cofre" && itemName === "chave velha") {
+            console.log("Cofre destrancado!");
+            target.acaoOk = true;
+            this.#flags.cofreAberto = true;
+            target.chaves.forEach(k => this.#player.addItem(k));
+            return;
         }
 
-        if (target instanceof Objeto && target.name === "Porta Final") {
-            if (tool.name === "chave verdadeira") {
+        // Tratamento da porta final
+        if (target.name === "Porta Final") {
+            if (itemName === "chave verdadeira") {
                 console.log("Parabéns! Você abriu a porta com a chave verdadeira e venceu o jogo!");
             } else {
                 console.log("Você tentou abrir a porta com a chave falsa... Preso para sempre!");
             }
-            this.fim = true;
+            this.#fim = true;
             return;
         }
 
-        if (tool.usar(target)) {
-            return;
+        if (typeof item.usar === "function") {
+            if (!item.usar(target)) {
+                console.log("Nada aconteceu.");
+            }
+        } else {
+            console.log("Nada aconteceu.");
         }
-
-        console.log("Nada aconteceu.");
     }
 
     showInventory() {
-        this.player.showInventory();
+        this.#player.showInventory();
     }
 
     discard(itemName) {
-        this.player.removeItem(itemName);
+        this.#player.removeItem(itemName);
     }
 }
 

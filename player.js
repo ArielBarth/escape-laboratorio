@@ -4,17 +4,13 @@ const Mochila = require('./mochila');
 class Player {
     #mochila;
 
-    constructor(name) {
+    constructor(name, capacidadeMochila = 5) {
         this.name = name;
-        this.#mochila = new Mochila();
+        this.#mochila = new Mochila(capacidadeMochila);
     }
 
     addItem(item) {
-        if (this.#mochila.guarda(item)) {
-            console.log(`${item.name} foi adicionado ao inventário.`);
-        } else {
-            console.log(`Não foi possível adicionar ${item.name} ao inventário.`);
-        }
+        this.#mochila.guarda(item);
     }
 
     hasItem(name) {
@@ -31,6 +27,10 @@ class Player {
 
     removeItem(name) {
         this.#mochila.remove(name);
+    }
+
+    setMochilaCapacidade(novaCapacidade) {
+        this.#mochila.setCapacidade(novaCapacidade);
     }
 }
 

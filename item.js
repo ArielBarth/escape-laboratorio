@@ -1,15 +1,25 @@
 // item.js
-// Classe base que representa qualquer item do jogo (Ferramentas e Objetos herdam desta)
-
 class Item {
-    /**
-     * Construtor do item
-     * @param {string} name - Nome do item
-     * @param {string} description - Descrição do item
-     */
+    #name;
+    #description;
+
     constructor(name, description) {
-        this.name = name; // Nome identificador do item
-        this.description = description; // Descrição detalhada do item
+        this.#name = name;
+        this.#description = description;
+    }
+
+    get name() {
+        return this.#name;
+    }
+
+    get description() {
+        return this.#description;
+    }
+
+    // Método genérico que pode ser sobrescrito pelas subclasses
+    use(target) {
+        console.log("Nada aconteceu.");
+        return false;
     }
 }
 

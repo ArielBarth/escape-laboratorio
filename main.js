@@ -1,6 +1,4 @@
 // main.js
-// Arquivo principal que inicia o jogo e gerencia a interação com o jogador via terminal
-
 const Game = require('./game');
 const readline = require('readline');
 
@@ -16,7 +14,7 @@ const rl = readline.createInterface({
 console.log("\nComandos disponíveis:");
 console.log("- ir <direção> (norte, leste, sul, oeste)");
 console.log("- pegar <item>");
-console.log("- usar <ferramenta> <objeto>");
+console.log("- usar <item> <alvo>");
 console.log("- inventario");
 console.log("- descartar <item>");
 console.log("- sair\n");
@@ -28,57 +26,73 @@ function promptUser() {
         return;
     }
 
-    rl.question("Digite um comando: ", (cmd) => {
-        const partes = cmd.trim().split(' ');
-        const comando = partes[0].toLowerCase();
+    rl.question("Digite um comando: ", (input) => {
+        const [comando, ...args] = input.trim().split(' ');
 
-        if (comando === "sair") {
-            console.log("Saindo do jogo...");
-            rl.close();
-            return;
-        }
+        switch (comando.toLowerCase()) {
+            case 'sair':
+                console.log("Saindo do jogo...");
+                rl.close();
+                return;
 
-        if (comando === "ir") {
-            game.move(partes[1]);
-        } else if (comando === "pegar") {
-            const itemName = partes.slice(1).join(' ');
-            game.take(itemName);
-        } else if (comando === "usar") {
-            if (partes.length < 3) {
-                console.log("Uso incorreto! Formato: usar <ferramenta> <objeto>");
-            } else {
-                const args = partes.slice(1);
-                let toolName = "";
-                let targetName = "";
+            case 'ir':
+                if (args.length === 0) {
+                    console.log("Uso incorreto! Formato: ir <direção>");
+                } else {
+                    game.move(args[0].toLowerCase());
+                }
+                break;
 
-                for (let i = args.length; i > 0; i--) {
-                    const possibleTool = args.slice(0, i).join(' ');
-                    if (game.player.hasItem(possibleTool)) {
-                        toolName = possibleTool;
-                        targetName = args.slice(i).join(' ');
-                        break;
+            case 'pegar':
+                if (args.length === 0) {
+                    console.log("Uso incorreto! Formato: pegar <item>");
+                } else {
+                    const itemName = args.join(' ');
+                    game.take(itemName);
+                }
+                break;
+
+            case 'usar':
+                if (args.length < 2) {
+                    console.log("Uso incorreto! Formato: usar <item> <alvo>");
+                } else {
+                    // Determinar item e alvo dinamicamente
+                    let itemName = '';
+                    let targetName = '';
+                    for (let i = args.length; i > 0; i--) {
+                        const possibleItem = args.slice(0, i).join(' ');
+                        if (game.player.hasItem(possibleItem)) {
+                            itemName = possibleItem;
+                            targetName = args.slice(i).join(' ');
+                            break;
+                        }
+                    }
+
+                    if (!itemName) {
+                        console.log("Você não possui esse item.");
+                    } else if (!targetName) {
+                        console.log("Alvo inválido!");
+                    } else {
+                        game.use(itemName, targetName);
                     }
                 }
+                break;
 
-                if (!toolName) {
-                    console.log("Você não possui essa ferramenta.");
-                } else if (!targetName) {
-                    console.log("Alvo inválido!");
+            case 'inventario':
+                game.showInventory();
+                break;
+
+            case 'descartar':
+                if (args.length === 0) {
+                    console.log("Uso incorreto! Formato: descartar <item>");
                 } else {
-                    game.use(toolName, targetName);
+                    const itemName = args.join(' ');
+                    game.discard(itemName);
                 }
-            }
-        } else if (comando === "inventario") {
-            game.showInventory();
-        } else if (comando === "descartar") {
-            const itemName = partes.slice(1).join(' ');
-            if (!itemName) {
-                console.log("Uso incorreto! Formato: descartar <item>");
-            } else {
-                game.discard(itemName);
-            }
-        } else {
-            console.log("Comando inválido!");
+                break;
+
+            default:
+                console.log("Comando inválido!");
         }
 
         promptUser();
